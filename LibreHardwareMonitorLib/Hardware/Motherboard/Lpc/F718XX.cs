@@ -30,9 +30,10 @@ internal class F718XX : ISuperIO
         _address = address;
         Chip = chip;
 
-        // F71889AD and F71889ED share the F71882FG fan register map. Their fans only follow the
-        // PWM register once the per-fan bits in FAN_PWM_ENABLE_REG select manual duty-cycle mode.
-        _hasFanPwmEnable = chip is Chip.F71889AD or Chip.F71889ED;
+        // F71878AD (F71868A), F71889AD and F71889ED share the F71882FG fan register map. Their fans
+        // only follow the PWM register once the per-fan bits in FAN_PWM_ENABLE_REG select manual
+        // duty-cycle mode.
+        _hasFanPwmEnable = chip is Chip.F71878AD or Chip.F71889AD or Chip.F71889ED;
 
         Voltages = new float?[chip == Chip.F71858 ? 3 : 9];
         Temperatures = new float?[chip == Chip.F71808E ? 2 : 3];
@@ -208,17 +209,9 @@ internal class F718XX : ISuperIO
         for (int i = 0; i < Controls.Length; i++)
         {
             if (_hasFanPwmEnable)
-            {
                 Controls[i] = ReadFanPwmEnableControl(i, fanPwmEnable);
-            }
-            else if (Chip == Chip.F71882)
-            {
-                Controls[i] = ReadByte(FAN_PWM_REG[i]) * 100.0f / 0xFF;
-            }
             else
-            {
-                Controls[i] = ReadByte((byte)(PWM_VALUES_OFFSET + i)) * 100.0f / 0xFF;
-            }
+                Controls[i] = ReadByte(FAN_PWM_REG[i]) * 100.0f / 0xFF;
         }
 
         Mutexes.ReleaseIsaBus();
@@ -252,7 +245,7 @@ internal class F718XX : ISuperIO
 
         if (_hasFanPwmEnable)
         {
-            if (Chip == Chip.F71889ED && !_restoreFanFaultTRequired)
+            if (Chip is Chip.F71878AD or Chip.F71889ED && !_restoreFanFaultTRequired)
             {
                 // Bit 7 selects a second bank for the fan registers; the writes below must land in bank 0.
                 _initialFanFaultT = ReadByte(FAN_FAULT_T_REG);
@@ -347,7 +340,6 @@ internal class F718XX : ISuperIO
 
     private const byte ADDRESS_REGISTER_OFFSET = 0x05;
     private const byte DATA_REGISTER_OFFSET = 0x06;
-    private const byte PWM_VALUES_OFFSET = 0x2D;
     private const byte TEMPERATURE_BASE_REG = 0x70;
     private const byte TEMPERATURE_CONFIG_REG = 0x69;
 
